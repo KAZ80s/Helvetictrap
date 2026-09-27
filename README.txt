@@ -1,4 +1,4 @@
-HELVETICTRAP '84 — PHASE 1.1
+HELVETICTRAP '84 — PHASE 1.2
 ==============================
 
 Start:
@@ -23,6 +23,12 @@ Neu in Phase 1.1:
 - Jeder Fund erscheint gross im Spielfeld und dauerhaft im Fundprotokoll.
 - Mögliche Funde: Geheimdossier, Ersatzfalle, Sanitätspaket und Patrouillenplan.
 - Eine rote Alarmanzeige warnt, sobald eine Patrouille dich entdeckt hat.
+
+Neu in Phase 1.2:
+- Der Auftrag steht gross und zentral über dem Spielfeld.
+- Vor jedem Level gibt es eine 3-sekündige Einsatzanzeige mit Countdown.
+- Während des Countdowns sind Spieler und Patrouillen vollständig angehalten.
+- Patrouillen beginnen weiter vom Startpunkt entfernt.
 
 Phase 1:
 - 10 spielbare Einsätze

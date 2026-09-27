@@ -4,7 +4,7 @@ const ui={level:document.getElementById('level'),score:document.getElementById('
 const modal=document.getElementById('modal'),startBtn=document.getElementById('startBtn'),helpBtn=document.getElementById('helpBtn');
 const W=960,H=540,T=40,COLS=24,ROWS=13;
 const keys=new Set();
-let running=false,paused=false,last=0,level=0,score=0,lives=3,trapCount=3,hasDossier=false,searchCooldown=0,alerted=false,found={dossier:0,trap:0,medkit:0,intel:0},reveal=null;
+let running=false,paused=false,last=0,level=0,score=0,lives=3,trapCount=3,hasDossier=false,searchCooldown=0,alerted=false,found={dossier:0,trap:0,medkit:0,intel:0},reveal=null,levelIntro=0;
 let player,guards=[],crates=[],traps=[],exitDoor,walls=[];
 const LEVELS=[
  {name:"Alpenposten",guards:1,crates:3,traps:3,speed:70,theme:"BERGPOSTEN"},
@@ -42,8 +42,8 @@ function makeLevel(){
  for(let i=spots.length-1;i>0;i--){let j=Math.floor(seeded(level*100+i)* (i+1));[spots[i],spots[j]]=[spots[j],spots[i]]}
  for(let i=0;i<cfg.crates;i++){let s=spots.pop(),roll=seeded(level*71+i*19),loot=roll>.78?'medkit':roll>.48?'intel':roll>.25?'trap':'empty';crates.push({...s,w:28,h:28,searched:false,loot})}
  crates[Math.floor(seeded(level+33)*crates.length)].loot='dossier';
- for(let i=0;i<cfg.guards;i++){let s=spots.pop();guards.push({x:s.x,y:s.y,w:24,h:24,speed:cfg.speed,stun:0,target:null,repath:0,phase:i})}
- reveal=null;alerted=false;
+ for(let i=0;i<cfg.guards;i++){let best=0;for(let j=1;j<spots.length;j++)if(Math.hypot(spots[j].x-player.x,spots[j].y-player.y)>Math.hypot(spots[best].x-player.x,spots[best].y-player.y))best=j;let s=spots.splice(best,1)[0];guards.push({x:s.x,y:s.y,w:24,h:24,speed:cfg.speed,stun:0,target:null,repath:0,phase:i})}
+ reveal=null;alerted=false;levelIntro=3;keys.clear();
  updateUI();
 }
 function updateUI(){
@@ -60,12 +60,12 @@ function moveEntity(e,dx,dy){
  e.x=Math.max(31,Math.min(W-31-e.w,e.x));e.y=Math.max(31,Math.min(H-31-e.h,e.y));
 }
 function placeTrap(){
- if(!running||paused||trapCount<=0)return;
+ if(!running||paused||levelIntro>0||trapCount<=0)return;
  if(traps.some(t=>Math.hypot(t.x-player.x,t.y-player.y)<35))return;
  traps.push({x:player.x+4,y:player.y+4,w:16,h:16,life:18});trapCount--;updateUI();
 }
 function search(){
- if(!running||paused||searchCooldown>0)return; searchCooldown=.35;
+ if(!running||paused||levelIntro>0||searchCooldown>0)return; searchCooldown=.35;
  let c=crates.find(c=>!c.searched&&Math.hypot(c.x-player.x,c.y-player.y)<58);
  if(!c)return;
  c.searched=true;let label='DEPOT LEER',color='#8a8a8a';
@@ -86,11 +86,11 @@ function loseLife(){
 function nextLevel(){
  score+=1000+trapCount*100;
  if(level>=LEVELS.length-1){endGame(true);return}
- level++;makeLevel();toast("NÄCHSTER EINSATZ");
+ level++;makeLevel();
 }
 function endGame(win){
  running=false;
- modal.innerHTML=`<div class="panel"><h1>${win?"AUFTRAG ERFÜLLT":"EINSATZ BEENDET"}</h1><p class="result">Punkte: <b>${score}</b></p><p>${win?"Alle 10 Phase-1-Einsätze abgeschlossen.":"Die Patrouillen haben dich gestoppt."}</p><p class="note">HELVETICTRAP '84 · Phase 1</p><button id="again">NEU STARTEN</button></div>`;
+ modal.innerHTML=`<div class="panel"><h1>${win?"AUFTRAG ERFÜLLT":"EINSATZ BEENDET"}</h1><p class="result">Punkte: <b>${score}</b></p><p>${win?"Alle 10 Phase-1-Einsätze abgeschlossen.":"Die Patrouillen haben dich gestoppt."}</p><p class="note">HELVETICTRAP '84 · Phase 1.2</p><button id="again">NEU STARTEN</button></div>`;
  modal.classList.add('show');document.getElementById('again').onclick=startGame;
 }
 function startGame(){level=0;score=0;lives=3;found={dossier:0,trap:0,medkit:0,intel:0};ui.lastFound.textContent='LETZTER FUND: —';paused=false;running=true;makeLevel();modal.classList.remove('show');last=performance.now();requestAnimationFrame(loop)}
@@ -100,6 +100,7 @@ function choosePatrolTarget(g){
 }
 function update(dt){
  if(!running||paused)return;
+ if(levelIntro>0){levelIntro=Math.max(0,levelIntro-dt);return}
  searchCooldown=Math.max(0,searchCooldown-dt);player.inv=Math.max(0,player.inv-dt);
  if(reveal){reveal.time-=dt;if(reveal.time<=0)reveal=null}
  let dx=0,dy=0;if(keys.has('ArrowLeft')||keys.has('KeyA'))dx--;if(keys.has('ArrowRight')||keys.has('KeyD'))dx++;if(keys.has('ArrowUp')||keys.has('KeyW'))dy--;if(keys.has('ArrowDown')||keys.has('KeyS'))dy++;
@@ -136,6 +137,7 @@ function draw(){
  if(player.inv<=0||Math.floor(player.inv*10)%2===0){ctx.fillStyle='#e8e8dc';ctx.fillRect(player.x,player.y,player.w,player.h);ctx.fillStyle='#b82028';ctx.fillRect(player.x+7,player.y+7,10,10);ctx.fillStyle='#fff';ctx.fillRect(player.x+11,player.y+8,2,8);ctx.fillRect(player.x+8,player.y+11,8,2)}
  ctx.fillStyle='#eee';ctx.font='14px monospace';ctx.fillText(LEVELS[level].theme,40,H-42);
  if(reveal){ctx.fillStyle='#000d';ctx.fillRect(W/2-190,36,380,58);ctx.strokeStyle=reveal.color;ctx.lineWidth=3;ctx.strokeRect(W/2-190,36,380,58);ctx.fillStyle=reveal.color;ctx.font='bold 20px monospace';ctx.textAlign='center';ctx.fillText(reveal.text,W/2,72);ctx.textAlign='left'}
+ if(levelIntro>0){let seconds=Math.max(1,Math.ceil(levelIntro));ctx.fillStyle='#000d';ctx.fillRect(0,0,W,H);ctx.strokeStyle='#f3d34a';ctx.lineWidth=4;ctx.strokeRect(W/2-270,H/2-105,540,210);ctx.fillStyle='#f3d34a';ctx.textAlign='center';ctx.font='bold 24px monospace';ctx.fillText(`EINSATZ ${level+1} · ${LEVELS[level].name.toUpperCase()}`,W/2,H/2-52);ctx.fillStyle='#fff';ctx.font='bold 29px monospace';ctx.fillText('AUFTRAG: DOSSIER FINDEN',W/2,H/2-4);ctx.font='bold 48px monospace';ctx.fillText(String(seconds),W/2,H/2+62);ctx.textAlign='left'}
  if(paused){ctx.fillStyle='#000b';ctx.fillRect(0,0,W,H);ctx.fillStyle='#fff';ctx.font='36px monospace';ctx.textAlign='center';ctx.fillText('PAUSE',W/2,H/2);ctx.textAlign='left'}
 }
 function loop(t){let dt=Math.min(.033,(t-last)/1000||0);last=t;update(dt);draw();if(running)requestAnimationFrame(loop)}
@@ -143,4 +145,4 @@ addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight
 addEventListener('keyup',e=>keys.delete(e.code));
 document.querySelectorAll('[data-key]').forEach(b=>{let k=b.dataset.key;const down=e=>{e.preventDefault();keys.add(k);if(k==='Space')placeTrap();if(k==='KeyE')search()};const up=e=>{e.preventDefault();keys.delete(k)};b.addEventListener('pointerdown',down);b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('pointerleave',up)});
 startBtn.onclick=startGame;
-helpBtn.onclick=()=>{paused=true;modal.innerHTML=`<div class="panel"><h1>ANLEITUNG</h1><p>Finde das Dossier in einem der Depots. Stelle dich nahe an eine Kiste und drücke E/SUCHEN. Nach dem Fund wird der Ausgang aktiv.</p><p>Patrouillen kosten bei Berührung ein Leben. Lege mit Leertaste/FALLE eine Bodenfalle. Eine Patrouille bleibt danach kurz ausgeschaltet.</p><p>WASD/Pfeile bewegen · E suchen · Leertaste Falle · P Pause</p><button id="resume">WEITER</button></div>`;modal.classList.add('show');document.getElementById('resume').onclick=()=>{modal.classList.remove('show');paused=false;last=performance.now();if(running)requestAnimationFrame(loop)}};
+helpBtn.onclick=()=>{paused=true;modal.innerHTML=`<div class="panel"><h1>ANLEITUNG</h1><p>Finde das Dossier in einem der Depots. Stelle dich nahe an eine Kiste und drücke E/SUCHEN. Nach dem Fund wird der Ausgang aktiv.</p><p>Patrouillen kosten bei Berührung ein Leben. Lege mit Leertaste/FALLE eine Bodenfalle. Eine Patrouille bleibt danach kurz ausgeschaltet.</p><p>Vor jedem Einsatz zeigt ein Countdown den Auftrag. Währenddessen ist das Spielfeld angehalten.</p><p>WASD/Pfeile bewegen · E suchen · Leertaste Falle · P Pause</p><button id="resume">WEITER</button></div>`;modal.classList.add('show');document.getElementById('resume').onclick=()=>{modal.classList.remove('show');paused=false;last=performance.now()}};
