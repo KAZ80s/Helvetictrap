@@ -1,10 +1,11 @@
 'use strict';
 const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
 const ui={level:document.getElementById('level'),score:document.getElementById('score'),lives:document.getElementById('lives'),traps:document.getElementById('traps'),objective:document.getElementById('objective'),alert:document.getElementById('alert'),inventory:document.getElementById('inventory'),lastFound:document.getElementById('lastFound')};
-const modal=document.getElementById('modal'),startBtn=document.getElementById('startBtn'),helpBtn=document.getElementById('helpBtn');
+const modal=document.getElementById('modal'),startBtn=document.getElementById('startBtn'),startPhase2Btn=document.getElementById('startPhase2Btn'),helpBtn=document.getElementById('helpBtn');
 const W=960,H=540,T=40,COLS=24,ROWS=13;
 const keys=new Set();
-let running=false,paused=false,last=0,level=0,score=0,lives=3,trapCount=3,hasDossier=false,searchCooldown=0,alerted=false,found={dossier:0,trap:0,medkit:0,intel:0},reveal=null,levelIntro=0;
+const TRAP_TYPES=[{id:'stun',label:'SCHOCK'},{id:'decoy',label:'KÖDER'},{id:'smoke',label:'RAUCH'},{id:'net',label:'NETZ'}];
+let running=false,paused=false,last=0,level=0,score=0,lives=3,trapStock={stun:3,decoy:0,smoke:0,net:0},selectedTrap=0,hasDossier=false,searchCooldown=0,alerted=false,found={dossier:0,trap:0,medkit:0,intel:0},reveal=null,levelIntro=0,campaignStart=0;
 let player,guards=[],crates=[],traps=[],exitDoor,walls=[];
 const LEVELS=[
  {name:"Alpenposten",guards:1,crates:3,traps:3,speed:70,theme:"BERGPOSTEN"},
@@ -16,14 +17,32 @@ const LEVELS=[
  {name:"Rätikon-Pass",guards:3,crates:6,traps:3,speed:92,theme:"PASS"},
  {name:"Bernina-Archiv",guards:3,crates:6,traps:2,speed:100,theme:"ARCHIV"},
  {name:"Helvetic Vault",guards:4,crates:6,traps:3,speed:98,theme:"VAULT"},
- {name:"Gipfelstation",guards:4,crates:7,traps:2,speed:108,theme:"GIPFEL"}
+ {name:"Gipfelstation",guards:4,crates:7,traps:2,speed:108,theme:"GIPFEL"},
+ {name:"Luzern-Kasematte",guards:3,crates:6,traps:3,speed:94,theme:"KASEMATTE"},
+ {name:"Susten-Stollen",guards:3,crates:7,traps:3,speed:98,theme:"STOLLEN"},
+ {name:"Zürich-Werkhof",guards:4,crates:7,traps:3,speed:96,theme:"WERKHOF"},
+ {name:"Wallis-Kraftwerk",guards:4,crates:7,traps:2,speed:102,theme:"KRAFTWERK"},
+ {name:"Engadin-Depot",guards:4,crates:8,traps:3,speed:106,theme:"ENGADIN"},
+ {name:"Basel-Rheinhafen",guards:5,crates:8,traps:3,speed:103,theme:"HAFEN"},
+ {name:"Gruyère-Festung",guards:5,crates:8,traps:2,speed:108,theme:"FESTUNG"},
+ {name:"Jungfrau-Labor",guards:5,crates:9,traps:3,speed:111,theme:"LABOR"},
+ {name:"Simplon-Vault",guards:6,crates:9,traps:2,speed:114,theme:"SIMPLON"},
+ {name:"Bundesarchiv",guards:6,crates:10,traps:2,speed:118,theme:"ARCHIV FINALE"}
 ];
 function rect(x,y,w,h){return{x,y,w,h}}
 function overlap(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y}
 function blocked(r){return walls.some(w=>overlap(r,w))}
 function seeded(n){let x=Math.sin(n*999)*43758.5453;return x-Math.floor(x)}
+function trapInfo(){return TRAP_TYPES[selectedTrap]}
+function totalTraps(){return Object.values(trapStock).reduce((a,b)=>a+b,0)}
+function cycleTrap(){
+ if(!running||paused||levelIntro>0)return;
+ for(let i=1;i<=TRAP_TYPES.length;i++){let next=(selectedTrap+i)%TRAP_TYPES.length;if(trapStock[TRAP_TYPES[next].id]>0){selectedTrap=next;break}}
+ updateUI();
+}
 function makeLevel(){
- const cfg=LEVELS[level]; hasDossier=false; trapCount=cfg.traps; traps=[]; guards=[]; crates=[]; walls=[];
+ const cfg=LEVELS[level]; hasDossier=false; traps=[]; guards=[]; crates=[]; walls=[];
+ trapStock={stun:cfg.traps,decoy:level>=3?1:0,smoke:level>=6?1:0,net:level>=9?1:0};selectedTrap=0;
  player={x:55,y:65,w:24,h:24,speed:165,inv:0};
  exitDoor=rect(W-70,H-75,34,46);
  // Outer Swiss-fortress geometry + level-dependent inner walls.
@@ -33,7 +52,12 @@ function makeLevel(){
   [[6,1,1,7],[12,5,1,7],[18,1,1,7]],
   [[4,4,6,1],[14,4,6,1],[9,8,6,1]],
   [[6,2,1,4],[6,8,1,3],[12,4,1,6],[18,2,1,7]],
-  [[4,3,7,1],[13,3,7,1],[7,8,10,1]]
+  [[4,3,7,1],[13,3,7,1],[7,8,10,1]],
+  [[3,2,1,7],[8,6,8,1],[20,2,1,7]],
+  [[5,2,5,1],[14,2,5,1],[5,8,5,1],[14,8,5,1]],
+  [[7,1,1,5],[7,8,1,4],[16,1,1,5],[16,8,1,4]],
+  [[3,4,7,1],[14,4,7,1],[8,9,8,1]],
+  [[5,2,1,8],[10,2,1,4],[14,6,1,6],[19,2,1,8]]
  ];
  const p=patterns[level%patterns.length];
  p.forEach(a=>walls.push(rect(a[0]*T,a[1]*T,a[2]*T,a[3]*T)));
@@ -42,14 +66,14 @@ function makeLevel(){
  for(let i=spots.length-1;i>0;i--){let j=Math.floor(seeded(level*100+i)* (i+1));[spots[i],spots[j]]=[spots[j],spots[i]]}
  for(let i=0;i<cfg.crates;i++){let s=spots.pop(),roll=seeded(level*71+i*19),loot=roll>.78?'medkit':roll>.48?'intel':roll>.25?'trap':'empty';crates.push({...s,w:28,h:28,searched:false,loot})}
  crates[Math.floor(seeded(level+33)*crates.length)].loot='dossier';
- for(let i=0;i<cfg.guards;i++){let best=0;for(let j=1;j<spots.length;j++)if(Math.hypot(spots[j].x-player.x,spots[j].y-player.y)>Math.hypot(spots[best].x-player.x,spots[best].y-player.y))best=j;let s=spots.splice(best,1)[0];guards.push({x:s.x,y:s.y,w:24,h:24,speed:cfg.speed,stun:0,target:null,repath:0,phase:i})}
+ for(let i=0;i<cfg.guards;i++){let best=0;for(let j=1;j<spots.length;j++)if(Math.hypot(spots[j].x-player.x,spots[j].y-player.y)>Math.hypot(spots[best].x-player.x,spots[best].y-player.y))best=j;let s=spots.splice(best,1)[0],type=level<10?'normal':['armor','detector','sprint','normal'][i%4];guards.push({x:s.x,y:s.y,w:24,h:24,speed:cfg.speed*(type==='sprint'?1.14:1),stun:0,slow:0,target:null,repath:0,phase:i,type})}
  reveal=null;alerted=false;levelIntro=3;keys.clear();
  updateUI();
 }
 function updateUI(){
  ui.level.textContent=`LEVEL ${level+1} · ${LEVELS[level].name.toUpperCase()}`;
  ui.score.textContent=`PUNKTE ${String(score).padStart(5,'0')}`;
- ui.lives.textContent=`LEBEN ${lives}`; ui.traps.textContent=`FALLEN ${trapCount}`;
+ ui.lives.textContent=`LEBEN ${lives}`; ui.traps.textContent=`FALLE ${trapInfo().label} ${trapStock[trapInfo().id]} · TOTAL ${totalTraps()}`;
  ui.objective.textContent=hasDossier?"AUFTRAG: ZUM AUSGANG":"AUFTRAG: DOSSIER FINDEN";
  ui.inventory.textContent=`FUNDE: DOSSIER ${found.dossier} · FALLEN ${found.trap} · MEDKIT ${found.medkit} · HINWEISE ${found.intel}`;
  ui.alert.textContent=alerted?'STATUS: ALARM — PATROUILLEN VERFOLGEN DICH':'STATUS: UNENTDECKT';ui.alert.classList.toggle('danger',alerted);
@@ -60,9 +84,10 @@ function moveEntity(e,dx,dy){
  e.x=Math.max(31,Math.min(W-31-e.w,e.x));e.y=Math.max(31,Math.min(H-31-e.h,e.y));
 }
 function placeTrap(){
- if(!running||paused||levelIntro>0||trapCount<=0)return;
+ if(!running||paused||levelIntro>0||trapStock[trapInfo().id]<=0)return;
  if(traps.some(t=>Math.hypot(t.x-player.x,t.y-player.y)<35))return;
- traps.push({x:player.x+4,y:player.y+4,w:16,h:16,life:18});trapCount--;updateUI();
+ let type=trapInfo().id;traps.push({x:player.x+4,y:player.y+4,w:16,h:16,type,life:type==='stun'||type==='net'?18:type==='decoy'?6:7});trapStock[type]--;
+ if(trapStock[type]<=0)cycleTrap();else updateUI();
 }
 function search(){
  if(!running||paused||levelIntro>0||searchCooldown>0)return; searchCooldown=.35;
@@ -70,7 +95,7 @@ function search(){
  if(!c)return;
  c.searched=true;let label='DEPOT LEER',color='#8a8a8a';
  if(c.loot==='dossier'){hasDossier=true;found.dossier++;score+=500;label='GEHEIMDOSSIER';color='#f3d34a';toast("DOSSIER GEFUNDEN — AUSGANG ERREICHEN");}
- else if(c.loot==='trap'){trapCount++;found.trap++;score+=150;label='ERSATZFALLE';color='#63d6ff';toast("ERSATZFALLE GEFUNDEN");}
+ else if(c.loot==='trap'){let id=trapInfo().id;trapStock[id]++;found.trap++;score+=150;label=`ERSATZFALLE ${trapInfo().label}`;color='#63d6ff';toast("ERSATZFALLE GEFUNDEN");}
  else if(c.loot==='medkit'){if(lives<5)lives++;found.medkit++;score+=200;label='SANITÄTSPAKET +1 LEBEN';color='#7fe38d';toast("SANITÄTSPAKET GEFUNDEN");}
  else if(c.loot==='intel'){found.intel++;score+=250;guards.forEach(g=>g.stun=Math.max(g.stun,1.4));label='PATROUILLENPLAN +250';color='#d6a8ff';toast("PATROUILLENPLAN — GEGNER KURZ GESTOPPT");}
  else {score+=50;toast("DEPOT LEER — WEITERSUCHEN");}
@@ -84,16 +109,16 @@ function loseLife(){
  player.x=55;player.y=65;updateUI();toast("ERWISCHT — ZURÜCK ZUM START");
 }
 function nextLevel(){
- score+=1000+trapCount*100;
+ score+=1000+totalTraps()*100;
  if(level>=LEVELS.length-1){endGame(true);return}
  level++;makeLevel();
 }
 function endGame(win){
  running=false;
- modal.innerHTML=`<div class="panel"><h1>${win?"AUFTRAG ERFÜLLT":"EINSATZ BEENDET"}</h1><p class="result">Punkte: <b>${score}</b></p><p>${win?"Alle 10 Phase-1-Einsätze abgeschlossen.":"Die Patrouillen haben dich gestoppt."}</p><p class="note">HELVETICTRAP '84 · Phase 1.2</p><button id="again">NEU STARTEN</button></div>`;
- modal.classList.add('show');document.getElementById('again').onclick=startGame;
+ modal.innerHTML=`<div class="panel"><h1>${win?"AUFTRAG ERFÜLLT":"EINSATZ BEENDET"}</h1><p class="result">Punkte: <b>${score}</b></p><p>${win?"Alle 20 Einsätze abgeschlossen.":"Die Patrouillen haben dich gestoppt."}</p><p class="note">HELVETICTRAP '84 · Phase 2</p><button id="again">ERNEUT STARTEN</button></div>`;
+ modal.classList.add('show');document.getElementById('again').onclick=()=>startGame(campaignStart);
 }
-function startGame(){level=0;score=0;lives=3;found={dossier:0,trap:0,medkit:0,intel:0};ui.lastFound.textContent='LETZTER FUND: —';paused=false;running=true;makeLevel();modal.classList.remove('show');last=performance.now();requestAnimationFrame(loop)}
+function startGame(startAt=0){campaignStart=startAt;level=startAt;score=0;lives=3;found={dossier:0,trap:0,medkit:0,intel:0};ui.lastFound.textContent='LETZTER FUND: —';paused=false;running=true;makeLevel();modal.classList.remove('show');last=performance.now();requestAnimationFrame(loop)}
 function choosePatrolTarget(g){
  const candidates=[];for(let y=1;y<12;y++)for(let x=1;x<23;x++){let r=rect(x*T+8,y*T+8,g.w,g.h);if(!blocked(r)&&Math.hypot(r.x-g.x,r.y-g.y)>90)candidates.push(r)}
  if(!candidates.length)return{x:g.x,y:g.y};let idx=Math.floor(seeded(level*401+g.phase*97+Math.floor(performance.now()/1200))*candidates.length);return candidates[idx];
@@ -109,12 +134,15 @@ function update(dt){
  alerted=guards.some(g=>g.stun<=0&&Math.hypot(g.x-player.x,g.y-player.y)<210);
  guards.forEach(g=>{
   if(g.stun>0){g.stun-=dt;return}
-  g.repath-=dt;let sees=Math.hypot(g.x-player.x,g.y-player.y)<210;
-  if(sees)g.target={x:player.x,y:player.y};else if(!g.target||g.repath<=0||Math.hypot(g.target.x-g.x,g.target.y-g.y)<18){g.target=choosePatrolTarget(g);g.repath=1.2}
-  let ax=g.target.x-g.x,ay=g.target.y-g.y,n=Math.hypot(ax,ay)||1,before={x:g.x,y:g.y};moveEntity(g,ax/n*g.speed*(sees?1.28:1)*dt,ay/n*g.speed*(sees?1.28:1)*dt);
+  g.slow=Math.max(0,g.slow-dt);g.repath-=dt;let sees=Math.hypot(g.x-player.x,g.y-player.y)<210;
+  let decoy=g.type==='detector'?null:traps.find(t=>t.type==='decoy'&&Math.hypot(t.x-g.x,t.y-g.y)<380);
+  if(decoy){g.target={x:decoy.x,y:decoy.y};sees=false}else if(sees)g.target={x:player.x,y:player.y};else if(!g.target||g.repath<=0||Math.hypot(g.target.x-g.x,g.target.y-g.y)<18){g.target=choosePatrolTarget(g);g.repath=1.2}
+  let inSmoke=traps.some(t=>t.type==='smoke'&&Math.hypot(t.x-g.x,t.y-g.y)<82),speedFactor=(g.slow>0?.48:1)*(inSmoke?(g.type==='detector'?.78:.48):1);
+  let ax=g.target.x-g.x,ay=g.target.y-g.y,n=Math.hypot(ax,ay)||1,before={x:g.x,y:g.y};moveEntity(g,ax/n*g.speed*speedFactor*(sees?1.28:1)*dt,ay/n*g.speed*speedFactor*(sees?1.28:1)*dt);
   if(Math.hypot(g.x-before.x,g.y-before.y)<.2){g.target=choosePatrolTarget(g);g.repath=.1}
-  traps.forEach(t=>{if(overlap(g,t)){g.stun=3.2;t.life=0;score+=250;updateUI()}});
-  if(overlap(player,g))loseLife();
+  traps.forEach(t=>{if(!overlap(g,t))return;if(t.type==='stun'){g.stun=g.type==='armor'?1.4:3.2;t.life=0;score+=250;updateUI()}else if(t.type==='net'){g.slow=g.type==='armor'?2.2:5;t.life=0;score+=200;updateUI()}});
+  let playerHidden=traps.some(t=>t.type==='smoke'&&Math.hypot(t.x-player.x,t.y-player.y)<82)&&g.type!=='detector';
+  if(overlap(player,g)&&!playerHidden)loseLife();
  });
  ui.alert.textContent=alerted?'STATUS: ALARM — PATROUILLEN VERFOLGEN DICH':'STATUS: UNENTDECKT';ui.alert.classList.toggle('danger',alerted);
  if(hasDossier&&overlap(player,exitDoor))nextLevel();
@@ -132,8 +160,8 @@ function draw(){
  // exit
  ctx.fillStyle=hasDossier?'#e9e1b2':'#555';ctx.fillRect(exitDoor.x,exitDoor.y,exitDoor.w,exitDoor.h);ctx.fillStyle='#111';ctx.fillRect(exitDoor.x+8,exitDoor.y+8,18,30);ctx.fillStyle='#ddd';ctx.font='12px monospace';ctx.fillText('EXIT',exitDoor.x-1,exitDoor.y-6);
  crates.forEach(c=>{ctx.fillStyle=c.searched?'#454545':'#b28a4b';ctx.fillRect(c.x,c.y,c.w,c.h);ctx.strokeStyle='#e0c18b';ctx.strokeRect(c.x+3,c.y+3,c.w-6,c.h-6);if(c.searched){ctx.strokeStyle='#222';ctx.beginPath();ctx.moveTo(c.x,c.y);ctx.lineTo(c.x+c.w,c.y+c.h);ctx.stroke()}});
- traps.forEach(t=>{ctx.strokeStyle='#f3d34a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(t.x+8,t.y+8,8,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(t.x+3,t.y+3);ctx.lineTo(t.x+13,t.y+13);ctx.moveTo(t.x+13,t.y+3);ctx.lineTo(t.x+3,t.y+13);ctx.stroke()});
- guards.forEach(g=>{ctx.fillStyle=g.stun>0?'#858585':'#c74646';ctx.fillRect(g.x,g.y,g.w,g.h);ctx.fillStyle='#111';ctx.fillRect(g.x+5,g.y+6,4,4);ctx.fillRect(g.x+15,g.y+6,4,4)});
+ traps.forEach(t=>{ctx.lineWidth=2;if(t.type==='smoke'){ctx.fillStyle='#a9b6c455';ctx.beginPath();ctx.arc(t.x+8,t.y+8,78,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#c9d3dc';ctx.stroke()}else if(t.type==='decoy'){ctx.strokeStyle='#63d6ff';ctx.beginPath();ctx.arc(t.x+8,t.y+8,10+Math.sin(t.life*8)*3,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#63d6ff';ctx.fillRect(t.x+6,t.y+6,4,4)}else if(t.type==='net'){ctx.strokeStyle='#7fe38d';ctx.strokeRect(t.x,t.y,16,16);ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(t.x+16,t.y+16);ctx.moveTo(t.x+16,t.y);ctx.lineTo(t.x,t.y+16);ctx.stroke()}else{ctx.strokeStyle='#f3d34a';ctx.beginPath();ctx.arc(t.x+8,t.y+8,8,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(t.x+3,t.y+3);ctx.lineTo(t.x+13,t.y+13);ctx.moveTo(t.x+13,t.y+3);ctx.lineTo(t.x+3,t.y+13);ctx.stroke()}});
+ guards.forEach(g=>{ctx.fillStyle=g.stun>0?'#858585':'#c74646';ctx.fillRect(g.x,g.y,g.w,g.h);ctx.strokeStyle=g.type==='armor'?'#f3d34a':g.type==='detector'?'#63d6ff':g.type==='sprint'?'#d6a8ff':'#c74646';ctx.lineWidth=3;ctx.strokeRect(g.x-1,g.y-1,g.w+2,g.h+2);ctx.fillStyle='#111';ctx.fillRect(g.x+5,g.y+6,4,4);ctx.fillRect(g.x+15,g.y+6,4,4)});
  if(player.inv<=0||Math.floor(player.inv*10)%2===0){ctx.fillStyle='#e8e8dc';ctx.fillRect(player.x,player.y,player.w,player.h);ctx.fillStyle='#b82028';ctx.fillRect(player.x+7,player.y+7,10,10);ctx.fillStyle='#fff';ctx.fillRect(player.x+11,player.y+8,2,8);ctx.fillRect(player.x+8,player.y+11,8,2)}
  ctx.fillStyle='#eee';ctx.font='14px monospace';ctx.fillText(LEVELS[level].theme,40,H-42);
  if(reveal){ctx.fillStyle='#000d';ctx.fillRect(W/2-190,36,380,58);ctx.strokeStyle=reveal.color;ctx.lineWidth=3;ctx.strokeRect(W/2-190,36,380,58);ctx.fillStyle=reveal.color;ctx.font='bold 20px monospace';ctx.textAlign='center';ctx.fillText(reveal.text,W/2,72);ctx.textAlign='left'}
@@ -141,8 +169,8 @@ function draw(){
  if(paused){ctx.fillStyle='#000b';ctx.fillRect(0,0,W,H);ctx.fillStyle='#fff';ctx.font='36px monospace';ctx.textAlign='center';ctx.fillText('PAUSE',W/2,H/2);ctx.textAlign='left'}
 }
 function loop(t){let dt=Math.min(.033,(t-last)/1000||0);last=t;update(dt);draw();if(running)requestAnimationFrame(loop)}
-addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();keys.add(e.code);if(e.code==='Space')placeTrap();if(e.code==='KeyE')search();if(e.code==='KeyP')paused=!paused});
+addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();keys.add(e.code);if(e.code==='Space')placeTrap();if(e.code==='KeyE')search();if(e.code==='KeyQ')cycleTrap();if(e.code==='KeyP')paused=!paused});
 addEventListener('keyup',e=>keys.delete(e.code));
-document.querySelectorAll('[data-key]').forEach(b=>{let k=b.dataset.key;const down=e=>{e.preventDefault();keys.add(k);if(k==='Space')placeTrap();if(k==='KeyE')search()};const up=e=>{e.preventDefault();keys.delete(k)};b.addEventListener('pointerdown',down);b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('pointerleave',up)});
-startBtn.onclick=startGame;
-helpBtn.onclick=()=>{paused=true;modal.innerHTML=`<div class="panel"><h1>ANLEITUNG</h1><p>Finde das Dossier in einem der Depots. Stelle dich nahe an eine Kiste und drücke E/SUCHEN. Nach dem Fund wird der Ausgang aktiv.</p><p>Patrouillen kosten bei Berührung ein Leben. Lege mit Leertaste/FALLE eine Bodenfalle. Eine Patrouille bleibt danach kurz ausgeschaltet.</p><p>Vor jedem Einsatz zeigt ein Countdown den Auftrag. Währenddessen ist das Spielfeld angehalten.</p><p>WASD/Pfeile bewegen · E suchen · Leertaste Falle · P Pause</p><button id="resume">WEITER</button></div>`;modal.classList.add('show');document.getElementById('resume').onclick=()=>{modal.classList.remove('show');paused=false;last=performance.now()}};
+document.querySelectorAll('[data-key]').forEach(b=>{let k=b.dataset.key;const down=e=>{e.preventDefault();keys.add(k);if(k==='Space')placeTrap();if(k==='KeyE')search();if(k==='KeyQ')cycleTrap()};const up=e=>{e.preventDefault();keys.delete(k)};b.addEventListener('pointerdown',down);b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('pointerleave',up)});
+startBtn.onclick=()=>startGame(0);startPhase2Btn.onclick=()=>startGame(10);
+helpBtn.onclick=()=>{paused=true;modal.innerHTML=`<div class="panel"><h1>ANLEITUNG PHASE 2</h1><p>Finde das Dossier, erreiche den Ausgang und nutze vier Fallentypen: Schock stoppt, Köder lockt, Rauch verbirgt und Netz verlangsamt.</p><p>Gelb umrandete Gegner sind gepanzert, blaue Detektoren ignorieren Köder und sehen durch Rauch, violette Sprinter sind schneller.</p><p>Q/WECHSEL wählt die Falle · Leertaste/FALLE setzt sie · E/SUCHEN durchsucht Depots.</p><p>Vor jedem Einsatz zeigt ein Countdown den Auftrag. Währenddessen ist das Spielfeld angehalten.</p><button id="resume">WEITER</button></div>`;modal.classList.add('show');document.getElementById('resume').onclick=()=>{modal.classList.remove('show');paused=false;last=performance.now()}};

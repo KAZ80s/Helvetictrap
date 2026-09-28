@@ -1,0 +1,5 @@
+@media(max-width:650px){
+  #touch{align-items:center}
+  .actions{flex-direction:column;gap:2px}
+  .actions button{min-width:86px;min-height:40px;margin:1px}
+}

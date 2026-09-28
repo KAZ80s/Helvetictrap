@@ -1,4 +1,4 @@
-HELVETICTRAP '84 — PHASE 1.2
+HELVETICTRAP '84 — PHASE 2 · VERSION 0.2.0
 ==============================
 
 Start:
@@ -12,6 +12,7 @@ Steuerung:
 - Leertaste: Falle setzen
 - P: Pause
 - Mobil: Touch-Tasten
+- Q oder WECHSEL: Fallentyp wechseln
 
 Spielziel:
 In jedem Level ist das Dossier in einem der Depots versteckt.
@@ -30,6 +31,13 @@ Neu in Phase 1.2:
 - Während des Countdowns sind Spieler und Patrouillen vollständig angehalten.
 - Patrouillen beginnen weiter vom Startpunkt entfernt.
 
+Neu in Phase 2:
+- Insgesamt 20 Levels; Phase 2 kann direkt bei Level 11 gestartet werden.
+- Vier Fallen: Schock, Köder, Rauch und Netz.
+- Drei neue Gegner-Gegenmaßnahmen: Panzerung, Detektor und Sprinter.
+- Klare Farbumrandungen zeigen den Gegnertyp.
+- Neue Schweizer Schauplätze von Luzern bis Simplon und Bundesarchiv.
+
 Phase 1:
 - 10 spielbare Einsätze
 - Singleplayer
@@ -44,4 +52,4 @@ Dateien:
 index.html  Startseite
 style.css   Darstellung
 game.js     Spiellogik
-HELVETICTRAP_84_Phase1_Anleitung.docx  Anleitung, Levelbeschreibung, Security
+HELVETICTRAP_84_Phase2_Anleitung.docx  Anleitung, Levelbeschreibung, Security
