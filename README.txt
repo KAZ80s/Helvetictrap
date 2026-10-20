@@ -1,10 +1,10 @@
-HELVETICTRAP '84 — PHASE 2 · VERSION 0.2.0
+HELVETICTRAP '84 — PHASE 4 · VERSION 0.4.0
 ==============================
 
 Start:
 1. Ordner entpacken.
 2. index.html in einem aktuellen Browser öffnen.
-3. START drücken.
+3. Kampagne oder gewünschten Phasen-Einstieg starten.
 
 Steuerung:
 - WASD oder Pfeiltasten: bewegen
@@ -38,6 +38,14 @@ Neu in Phase 2:
 - Klare Farbumrandungen zeigen den Gegnertyp.
 - Neue Schweizer Schauplätze von Luzern bis Simplon und Bundesarchiv.
 
+Neu in Phase 3 — Swiss World:
+- Insgesamt 30 Levels; Phase 3 kann direkt bei Level 21 gestartet werden.
+- Zehn klar unterscheidbare Schweizer Schauplätze mit eigener Farbwelt und Architektur.
+- Berghütte, Werft, Altstadt, Hauptbahnhof, Festung, Gletscherstation,
+  Güterdepot, Kasematte, Bergstation und Gipfelbasis.
+- Die Schauplätze sind bewusst visuell: Steuerung, Fallen und Gegnerregeln bleiben vertraut.
+- Neue Kartenmuster und weiter steigende Patrouillendichte.
+
 Phase 1:
 - 10 spielbare Einsätze
 - Singleplayer
@@ -52,4 +60,21 @@ Dateien:
 index.html  Startseite
 style.css   Darstellung
 game.js     Spiellogik
-HELVETICTRAP_84_Phase2_Anleitung.docx  Anleitung, Levelbeschreibung, Security
+HELVETICTRAP_84_Phase3_Anleitung.docx  Anleitung, Levelbeschreibung, Security
+
+Phase 4 — Arcade (17.10.2026):
+- 30 Levels mit allen bisherigen Swiss-World-Schauplätzen.
+- Zeitbonus: 1200 Punkte minus 10 pro aktiver Spielsekunde, mindestens 0.
+- Countdown und Pause zählen nicht zur Einsatzzeit.
+- Combos: Funde/Fallentreffer innerhalb von 5 Sekunden; bis ×5.
+  Zusätzliche Combopunkte: 0 / 100 / 200 / 300 / 400 pro Aktion.
+- Treffer gegen den Spieler brechen die Combo ab.
+- Partikeleffekte bei Funden, Fallentreffern und Treffern.
+- 1,8 Sekunden Abschlussanzeige vor dem nächsten Einsatz-Countdown.
+- Lokale Retro-Sounds, oben mit SOUND AN/AUS umschaltbar.
+- Kein Zeitlimit: der Zeitbonus kann auslaufen, der Einsatz bleibt spielbar.
+
+Security-Check Phase 4:
+Audio ausschließlich lokal synthetisiert; keine Audiodateien, Downloads,
+Netzwerkzugriffe, Konten oder neuen persönlichen Daten. Effekte sind kurzlebig.
+Keine dynamische Codeausführung oder freien HTML-Eingaben. Risiko: niedrig.

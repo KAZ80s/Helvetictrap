@@ -1,0 +1,7 @@
+@media(max-width:650px){
+  #touch{align-items:center}
+  .actions{flex-direction:column;gap:2px}
+  .actions button{min-width:86px;min-height:40px;margin:1px}
+}
+
+#arcade{padding:8px;border:2px solid #63d6ff;color:#63d6ff;text-align:center;font-weight:bold}header{flex-wrap:wrap;gap:8px}.modal{overflow:auto}.panel{margin:auto}

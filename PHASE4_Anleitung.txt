@@ -1,0 +1,9 @@
+HELVETICTRAP 84 — PHASE 4 V0.4.0
+
+Die beiliegende Word-Anleitung beschreibt das Grundspiel bis Phase 3.
+Alle Neuerungen, Regeln und den Security-Check zu Phase 4 findest du
+in README.txt unter „Phase 4 — Arcade“.
+
+Start: index.html öffnen. Einstieg bei Level 1, 11 oder 21 wählen.
+Alle Arcade-Funktionen gelten ab jedem Einstieg.
+Sound: SOUND AN/AUS oben. Steuerung wie bisher.
