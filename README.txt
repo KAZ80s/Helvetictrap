@@ -1,4 +1,4 @@
-HELVETICTRAP '84 — PHASE 4 · VERSION 0.4.0
+HELVETICTRAP '84 — PHASE 4 · VERSION 0.4.1
 ==============================
 
 Start:
@@ -78,3 +78,9 @@ Security-Check Phase 4:
 Audio ausschließlich lokal synthetisiert; keine Audiodateien, Downloads,
 Netzwerkzugriffe, Konten oder neuen persönlichen Daten. Effekte sind kurzlebig.
 Keine dynamische Codeausführung oder freien HTML-Eingaben. Risiko: niedrig.
+
+V0.4.1 – Balance ab Level 20 (25.10.2026):
+- Gegnertempo ab Level 20 deutlich reduziert; weitere Steigerung gedeckelt.
+- Sprinter ab Level 20 nur noch 10 Prozent schneller als normale Gegner.
+- Selbst der schnellste verfolgende Sprinter bleibt langsamer als der Spieler.
+- Level 1–19 unverändert. Security: reine lokale Zahlenanpassung, keine neue Angriffsfläche.

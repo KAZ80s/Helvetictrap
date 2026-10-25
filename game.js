@@ -94,7 +94,7 @@ function makeLevel(){
  for(let i=spots.length-1;i>0;i--){let j=Math.floor(seeded(level*100+i)* (i+1));[spots[i],spots[j]]=[spots[j],spots[i]]}
  for(let i=0;i<cfg.crates;i++){let s=spots.pop(),roll=seeded(level*71+i*19),loot=roll>.78?'medkit':roll>.48?'intel':roll>.25?'trap':'empty';crates.push({...s,w:28,h:28,searched:false,loot})}
  crates[Math.floor(seeded(level+33)*crates.length)].loot='dossier';
- for(let i=0;i<cfg.guards;i++){let best=0;for(let j=1;j<spots.length;j++)if(Math.hypot(spots[j].x-player.x,spots[j].y-player.y)>Math.hypot(spots[best].x-player.x,spots[best].y-player.y))best=j;let s=spots.splice(best,1)[0],type=level<10?'normal':['armor','detector','sprint','normal'][i%4];guards.push({x:s.x,y:s.y,w:24,h:24,speed:cfg.speed*1.04*(type==='sprint'?1.14:1),stun:0,slow:0,target:null,repath:0,phase:i,type})}
+ for(let i=0;i<cfg.guards;i++){let best=0;for(let j=1;j<spots.length;j++)if(Math.hypot(spots[j].x-player.x,spots[j].y-player.y)>Math.hypot(spots[best].x-player.x,spots[best].y-player.y))best=j;let s=spots.splice(best,1)[0],type=level<10?'normal':['armor','detector','sprint','normal'][i%4];guards.push({x:s.x,y:s.y,w:24,h:24,speed:(level>=19?100+Math.min(4,(level-19)*.4):cfg.speed*1.04)*(type==='sprint'?(level>=19?1.10:1.14):1),stun:0,slow:0,target:null,repath:0,phase:i,type})}
  reveal=null;alerted=false;levelIntro=3;keys.clear();
  updateUI();
 }
